@@ -1,0 +1,64 @@
+---
+title: "Python and R with Feather"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+library(feather)
+library(ggplot2)
+```
+
+
+First use bash to append together several data files into a single file we can read and manipulate:
+
+```{bash}
+mydir=/home/nathan/sol-eng-sales/vignettes/notebooks/demos/5-feather
+cat $mydir/flights1.csv $mydir/flights2.csv $mydir/flights3.csv > $mydir/flights.csv
+```
+
+Now use **pandas** to read and filter the data. We'll pass it to R using the high-performance [feather](https://blog.rstudio.org/2016/03/29/feather/) serialization format:
+
+```{python}
+import pandas
+import feather
+import os
+
+file_in = os.path.join('/home/nathan/sol-eng-sales/vignettes/notebooks/demos/5-feather', 'flights.csv')
+file_out = os.path.join('/home/nathan/sol-eng-sales/vignettes/notebooks/demos/5-feather', 'flights.feather')
+
+# Read flights data and select flights to O'Hare
+flights = pandas.read_csv(file_in)
+flights = flights[flights['dest'] == "ORD"]
+
+# Select carrier and delay columns and drop rows with missing values
+flights = flights[['carrier', 'dep_delay', 'arr_delay']]
+flights = flights.dropna()
+
+# Write to feather file for reading from R
+feather.write_dataframe(flights, file_out)
+
+# Examine top 10 records
+print flights.head(10)
+```
+
+Now read from *flights.feather* into an R data frame and plot arrival delays by carrier using **ggplot2**:
+
+```{r}
+library(feather)
+library(ggplot2)
+
+# Read from feather and plot
+ff <- file.path("~/sol-eng-sales/vignettes/notebooks/demos/5-feather", "flights.feather")
+flights <- read_feather(ff)
+ggplot(flights, aes(carrier, arr_delay)) + geom_boxplot()
+```
+
+Plot the results.
+
+```{r}
+library(dplyr)
+library(highcharter)
+flights2 <- sample_n(flights, 100)
+highchart() %>% 
+  hc_add_serie_scatter(flights2$dep_delay, flights2$arr_delay, color = flights2$carrier)
+```
